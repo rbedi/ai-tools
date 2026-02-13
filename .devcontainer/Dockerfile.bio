@@ -1,0 +1,101 @@
+FROM condaforge/miniforge3:latest AS conda-build
+
+# Install mamba for faster solves
+RUN conda install -n base -c conda-forge mamba -y
+
+# Create conda env (just conda packages — no pip yet)
+COPY bio-environment.yml /tmp/bio-environment.yml
+RUN mamba env create -f /tmp/bio-environment.yml && \
+    conda clean -afy
+
+# Install pip packages separately so individual failures don't kill the build.
+# We install line-by-line: if a package fails, log it and continue.
+COPY bio-requirements.txt /tmp/bio-requirements.txt
+SHELL ["/bin/bash", "-c"]
+RUN set -e && \
+    source activate bio && \
+    failed="" && \
+    while IFS= read -r pkg || [ -n "$pkg" ]; do \
+        pkg=$(echo "$pkg" | xargs); \
+        [ -z "$pkg" ] && continue; \
+        [[ "$pkg" == \#* ]] && continue; \
+        echo "--- Installing: $pkg ---" && \
+        pip install --no-cache-dir "$pkg" || failed="$failed\n  $pkg"; \
+    done < /tmp/bio-requirements.txt && \
+    if [ -n "$failed" ]; then \
+        echo "" && \
+        echo "=== FAILED PACKAGES (not available on this platform) ===" && \
+        echo -e "$failed" && \
+        echo "========================================================" && \
+        echo ""; \
+    fi && \
+    echo "Pip install phase complete."
+
+# -----------------------------------------------------------
+FROM node:20-bookworm
+
+ARG TZ
+ENV TZ="$TZ"
+ARG CLAUDE_CODE_VERSION=latest
+
+# Install system deps: dev tools, firewall, and libs needed by scientific packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    less git procps sudo fzf man-db unzip gnupg2 gh \
+    iptables ipset iproute2 dnsutils aggregate jq nano vim \
+    libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
+    tesseract-ocr poppler-utils libmagic1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy conda installation from build stage
+COPY --from=conda-build /opt/conda /opt/conda
+ENV PATH="/opt/conda/envs/bio/bin:/opt/conda/bin:$PATH"
+ENV CONDA_DEFAULT_ENV=bio
+ENV CONDA_PREFIX=/opt/conda/envs/bio
+
+# Set up node user
+RUN mkdir -p /usr/local/share/npm-global && \
+    chown -R node:node /usr/local/share/npm-global
+
+ARG USERNAME=node
+
+RUN mkdir /commandhistory && \
+    touch /commandhistory/.bash_history && \
+    chown -R $USERNAME /commandhistory
+
+ENV DEVCONTAINER=true
+
+RUN mkdir -p /workspace /home/node/.claude && \
+    chown -R node:node /workspace /home/node/.claude && \
+    chown -R node:node /opt/conda
+
+WORKDIR /workspace
+
+USER node
+
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH="$PATH:/usr/local/share/npm-global/bin"
+ENV SHELL=/bin/bash
+ENV EDITOR=nano
+ENV VISUAL=nano
+
+# Install Claude Code
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+
+# Firewall script
+COPY init-firewall.sh /usr/local/bin/
+USER root
+RUN chmod +x /usr/local/bin/init-firewall.sh && \
+    echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
+    chmod 0440 /etc/sudoers.d/node-firewall
+
+# Init script that activates conda env
+RUN echo '#!/bin/bash\n\
+eval "$(/opt/conda/bin/conda shell.bash hook)"\n\
+conda activate bio\n\
+exec "$@"' > /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
+
+USER node
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]

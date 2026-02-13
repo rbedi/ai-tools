@@ -1,0 +1,37 @@
+name: bio
+channels:
+  - pytorch
+  - plotly
+  - anaconda
+  - bioconda
+  - salilab
+  - conda-forge
+dependencies:
+  - python=3.11
+  - abnumber
+  - altair
+  - bokeh
+  - boto3
+  - cvxpy
+  - cython
+  - ete3
+  - ffmpeg
+  - hmmer
+  - ipykernel
+  - ipython
+  - ipywidgets
+  - joblib
+  - jsonschema
+  - lxml
+  - matplotlib
+  - multipledispatch
+  - networkx
+  - patsy
+  - plotly
+  - psutil
+  - pytest
+  - pytest-regtest
+  - python-codon-tables
+  - seqlike
+  - statsmodels
+  - weblogo
