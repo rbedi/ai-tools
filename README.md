@@ -38,15 +38,20 @@ To add these or other packages, edit `.devcontainer/bio-requirements.txt` and re
 ## Options
 
 ```bash
-# Skip the network firewall (see "Network Access" below)
-./claude-docker.sh ~/my-project --no-firewall
+# Cap spend at $5 for this session
+./claude-docker.sh --budget 5 ~/my-project -p "fix all tests"
 
-# Use bio image without firewall
-./claude-docker.sh --bio --no-firewall ~/my-project
+# Skip the network firewall (see "Network Access" below)
+./claude-docker.sh --no-firewall ~/my-project
+
+# Use bio image without firewall, $10 budget
+./claude-docker.sh --bio --no-firewall --budget 10 ~/my-project
 
 # Pass any claude args after the directory
 ./claude-docker.sh ~/my-project -p "fix all tests" --model sonnet
 ```
+
+The `--budget` flag maps to Claude Code's `--max-budget-usd` and works in both print mode (`-p`) and interactive mode (shown in the shell prompt reminder).
 
 ## Network Access & Firewall
 
