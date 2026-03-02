@@ -17,10 +17,13 @@ PROJECT_DIR=""
 CLAUDE_ARGS=()
 ENABLE_FIREWALL=true
 USE_BIO=false
+FORCE_REBUILD=false
 
 for arg in "$@"; do
     if [[ "$arg" == "--bio" ]]; then
         USE_BIO=true
+    elif [[ "$arg" == "--rebuild" ]]; then
+        FORCE_REBUILD=true
     elif [[ "$arg" == "--no-firewall" ]]; then
         ENABLE_FIREWALL=false
     elif [[ -z "$PROJECT_DIR" && -d "$arg" ]]; then
@@ -55,10 +58,10 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEVCONTAINER_DIR="$SCRIPT_DIR/.devcontainer"
 
-if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+if $FORCE_REBUILD || ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     if $USE_BIO; then
         echo "Building Claude Code + Bio Docker image (this will take a while the first time)..."
-        docker build -t "$IMAGE_NAME" -f "$DEVCONTAINER_DIR/Dockerfile.bio" "$DEVCONTAINER_DIR"
+        docker build -t "$IMAGE_NAME" --build-arg HOST_UID="$(id -u)" -f "$DEVCONTAINER_DIR/Dockerfile.bio" "$DEVCONTAINER_DIR"
     else
         echo "Building Claude Code Docker image (first time only)..."
         docker build -t "$IMAGE_NAME" -f "$DEVCONTAINER_DIR/Dockerfile" "$DEVCONTAINER_DIR"
