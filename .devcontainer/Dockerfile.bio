@@ -37,6 +37,13 @@ FROM node:20-bookworm
 ARG TZ
 ENV TZ="$TZ"
 ARG CLAUDE_CODE_VERSION=latest
+ARG HOST_UID=1000
+
+# Change node user's UID to match host user (avoids bind-mount permission issues)
+RUN if [ "$HOST_UID" != "1000" ]; then \
+        usermod -u "$HOST_UID" node && \
+        find / -xdev -user 1000 -exec chown -h "$HOST_UID" {} + 2>/dev/null || true; \
+    fi
 
 # Install system deps: dev tools, firewall, and libs needed by scientific packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
