@@ -1,3 +1,5 @@
+# Light/frequently-changed packages. Heavy packages (torch, tf, etc.) are
+# in bio-requirements-heavy.txt and cached in a separate Docker layer.
 ablang==0.3.1
 absl-py==2.1.0
 aiohttp==3.9.1
@@ -23,14 +25,11 @@ docling>=2.20
 docling-core>=2.20
 docling-ibm-models>=3.4
 docling-parse>=3.4
-easyocr==1.7.2
 editdistance==0.8.1
 effdet==0.4.1
 einops==0.8.1
 emoji==2.10.1
 exrex==0.11.0
-fair-esm==2.0.0
-faiss-cpu==1.7.4
 # fast-tsp - no linux/arm64 wheel available
 feedparser==6.0.10
 flametree==0.1.12
@@ -42,7 +41,6 @@ google-auth==2.29.0
 google-auth-oauthlib==1.2.0
 grpcio==1.63.0
 gtfparse==2.5.0
-h5py
 html2text==2020.1.16
 httpx==0.25.2
 huggingface-hub>=0.29
@@ -72,27 +70,20 @@ mpire==2.10.2
 natsort==8.4.0
 nltk==3.8.1
 numba==0.61.2
-numpy==1.26.4
 omegaconf==2.3.0
-onnx==1.15.0
-onnxruntime==1.15.1
 openai>=1.50
-opencv-python-headless>=4.9
 openpyxl==3.1.5
 packaging==24.0
-pandas==2.2.2
 paper-qa>=3.13
 pdf2image==1.17.0
 pdfminer-six==20221105
 pdfplumber==0.10.4
 pikepdf==8.13.0
 pillow==10.3.0
-polars==0.20.23
 primer3-py
 # prody - fails to build on linux/arm64, install manually if needed
 protobuf==4.25.0
 pulp==2.8.0
-pyarrow==14.0.2
 pyclipper==1.3.0.post6
 pycryptodome==3.19.0
 pydantic==2.10.6
@@ -124,10 +115,6 @@ regex==2023.10.3
 requests==2.32.3
 rich==13.6.0
 rtree==1.3.0
-safetensors==0.5.2
-scikit-image>=0.22
-scikit-learn>=1.4
-scipy==1.14.1
 seaborn==0.13.2
 semchunk==2.2.2
 serializable==0.4.1
@@ -139,14 +126,9 @@ streamlit-aggrid==0.3.4.post3
 sympy==1.13.1
 tabulate==0.9.0
 tensorboard==2.15.2
-tensorflow==2.15.1
 tiktoken==0.5.1
-timm==0.9.16
-tokenizers==0.21.0
-torch==2.6.0
 torchmetrics==1.7.1
 tqdm==4.65.0
-transformers==4.49.0
 typer==0.12.5
 umap-learn>=0.5.9
 unstructured>=0.12

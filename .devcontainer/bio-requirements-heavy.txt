@@ -1,0 +1,21 @@
+# Large packages that rarely change — cached in their own layer
+torch==2.6.0
+tensorflow==2.15.1
+transformers==4.49.0
+tokenizers==0.21.0
+safetensors==0.5.2
+numpy==1.26.4
+scipy==1.14.1
+pandas==2.2.2
+scikit-learn>=1.4
+scikit-image>=0.22
+opencv-python-headless>=4.9
+faiss-cpu==1.7.4
+onnx==1.15.0
+onnxruntime==1.15.1
+polars==0.20.23
+pyarrow==14.0.2
+h5py
+easyocr==1.7.2
+timm==0.9.16
+fair-esm==2.0.0

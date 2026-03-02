@@ -8,10 +8,18 @@ COPY bio-environment.yml /tmp/bio-environment.yml
 RUN mamba env create -f /tmp/bio-environment.yml && \
     conda clean -afy
 
-# Install pip packages separately so individual failures don't kill the build.
-# We install line-by-line: if a package fails, log it and continue.
-COPY bio-requirements.txt /tmp/bio-requirements.txt
+# Install pip packages in two layers:
+#   1. Heavy/stable packages (torch, tf, etc.) — rarely change, cached separately
+#   2. Light packages — change more often, rebuild is fast
 SHELL ["/bin/bash", "-c"]
+
+# Layer 1: Heavy packages (slow to download, rarely edited)
+COPY bio-requirements-heavy.txt /tmp/bio-requirements-heavy.txt
+RUN source activate bio && \
+    pip install --no-cache-dir -r /tmp/bio-requirements-heavy.txt
+
+# Layer 2: Light packages (fast to install, may be edited often)
+COPY bio-requirements.txt /tmp/bio-requirements.txt
 RUN set -e && \
     source activate bio && \
     failed="" && \

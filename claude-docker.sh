@@ -3,11 +3,11 @@ set -euo pipefail
 
 # Claude Code Docker Runner
 # Usage:
-#   ./claude-docker.sh                          # Interactive session in current dir (base image)
-#   ./claude-docker.sh /path/to/project         # Interactive session in specified dir
-#   ./claude-docker.sh --bio /path/to/project   # Use bio image (with conda env)
-#   ./claude-docker.sh . -p "fix all tests"     # Pass args to claude (non-interactive)
-#   ./claude-docker.sh --no-firewall .          # Skip network firewall
+#   ./claude-docker.sh                              # Interactive session in current dir
+#   ./claude-docker.sh /path/to/project             # Interactive session in specified dir
+#   ./claude-docker.sh --bio /path/to/project       # Use bio image (with conda env)
+#   ./claude-docker.sh --budget 5 . -p "fix tests"  # Cap spend at $5
+#   ./claude-docker.sh --no-firewall .              # Skip network firewall
 
 IMAGE_NAME="claude-code-sandbox"
 CONTAINER_PREFIX="claude-sandbox"
@@ -18,19 +18,35 @@ CLAUDE_ARGS=()
 ENABLE_FIREWALL=true
 USE_BIO=false
 FORCE_REBUILD=false
+MAX_BUDGET=""
 
-for arg in "$@"; do
-    if [[ "$arg" == "--bio" ]]; then
-        USE_BIO=true
-    elif [[ "$arg" == "--rebuild" ]]; then
-        FORCE_REBUILD=true
-    elif [[ "$arg" == "--no-firewall" ]]; then
-        ENABLE_FIREWALL=false
-    elif [[ -z "$PROJECT_DIR" && -d "$arg" ]]; then
-        PROJECT_DIR="$arg"
-    else
-        CLAUDE_ARGS+=("$arg")
-    fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --bio)
+            USE_BIO=true
+            shift
+            ;;
+        --rebuild)
+            FORCE_REBUILD=true
+            shift
+            ;;
+        --no-firewall)
+            ENABLE_FIREWALL=false
+            shift
+            ;;
+        --budget)
+            MAX_BUDGET="$2"
+            shift 2
+            ;;
+        *)
+            if [[ -z "$PROJECT_DIR" && -d "$1" ]]; then
+                PROJECT_DIR="$1"
+            else
+                CLAUDE_ARGS+=("$1")
+            fi
+            shift
+            ;;
+    esac
 done
 
 if $USE_BIO; then
@@ -69,6 +85,12 @@ if $FORCE_REBUILD || ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
     echo ""
 fi
 
+# --- Build claude flags ---
+CLAUDE_FLAGS="--dangerously-skip-permissions"
+if [[ -n "$MAX_BUDGET" ]]; then
+    CLAUDE_FLAGS="$CLAUDE_FLAGS --max-budget-usd $MAX_BUDGET"
+fi
+
 # --- Run container ---
 CONTAINER_NAME="${CONTAINER_PREFIX}-$(date +%s)"
 
@@ -76,6 +98,9 @@ echo "Starting Claude Code sandbox..."
 echo "  Image: $IMAGE_NAME"
 echo "  Project: $PROJECT_DIR -> /workspace"
 echo "  Firewall: $ENABLE_FIREWALL"
+if [[ -n "$MAX_BUDGET" ]]; then
+    echo "  Budget: \$$MAX_BUDGET"
+fi
 echo ""
 
 DOCKER_ARGS=(
@@ -95,18 +120,18 @@ if [[ ${#CLAUDE_ARGS[@]} -gt 0 ]]; then
     # Non-interactive: run with args and exit
     if $ENABLE_FIREWALL; then
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c "sudo /usr/local/bin/init-firewall.sh && claude --dangerously-skip-permissions ${CLAUDE_ARGS[*]}"
+            bash -c "sudo /usr/local/bin/init-firewall.sh && claude $CLAUDE_FLAGS ${CLAUDE_ARGS[*]}"
     else
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c "claude --dangerously-skip-permissions ${CLAUDE_ARGS[*]}"
+            bash -c "claude $CLAUDE_FLAGS ${CLAUDE_ARGS[*]}"
     fi
 else
     # Interactive: drop into shell with claude available
     if $ENABLE_FIREWALL; then
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c 'sudo /usr/local/bin/init-firewall.sh && echo "Claude Code sandbox ready. Run: claude --dangerously-skip-permissions" && exec bash'
+            bash -c "sudo /usr/local/bin/init-firewall.sh && echo \"Claude Code sandbox ready. Run: claude $CLAUDE_FLAGS\" && exec bash"
     else
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c 'echo "Claude Code sandbox ready (no firewall). Run: claude --dangerously-skip-permissions" && exec bash'
+            bash -c "echo \"Claude Code sandbox ready (no firewall). Run: claude $CLAUDE_FLAGS\" && exec bash"
     fi
 fi
