@@ -61,12 +61,15 @@ fi
 PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"  # Resolve to absolute path
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 
-# --- Check for API key ---
-if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-    echo "Error: ANTHROPIC_API_KEY environment variable is not set."
+# --- Check for authentication ---
+if [[ -z "${ANTHROPIC_API_KEY:-}" && ! -f "$HOME/.claude/.credentials.json" ]]; then
+    echo "Error: No authentication found."
     echo ""
-    echo "Set it with:"
+    echo "Either set ANTHROPIC_API_KEY:"
     echo "  export ANTHROPIC_API_KEY='sk-ant-...'"
+    echo ""
+    echo "Or log in to Claude Code first:"
+    echo "  claude auth login"
     exit 1
 fi
 
@@ -109,29 +112,45 @@ DOCKER_ARGS=(
     --name "$CONTAINER_NAME"
     --cap-add=NET_ADMIN
     --cap-add=NET_RAW
-    -e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY"
     -e "NODE_OPTIONS=--max-old-space-size=4096"
     -v "$PROJECT_DIR:/workspace"
-    -v "claude-code-config:/home/node/.claude"
-    "$IMAGE_NAME"
+    -v "$HOME/.claude:/home/node/.claude"
+    -v "$HOME/.claude.json:/home/node/.claude.json"
 )
+
+# Only pass API key if set — avoids overriding OAuth credentials
+if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    DOCKER_ARGS+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
+fi
+
+DOCKER_ARGS+=("$IMAGE_NAME")
+
+# Ensure settings exist so Claude doesn't prompt for permission acceptance
+SEED_SETTINGS='mkdir -p /home/node/.claude && node -e "
+const fs = require(\"fs\");
+const f = \"/home/node/.claude/settings.json\";
+let s = {};
+try { s = JSON.parse(fs.readFileSync(f, \"utf8\")); } catch(e) {}
+s.skipDangerousModePermissionPrompt = true;
+fs.writeFileSync(f, JSON.stringify(s, null, 2));
+"'
 
 if [[ ${#CLAUDE_ARGS[@]} -gt 0 ]]; then
     # Non-interactive: run with args and exit
     if $ENABLE_FIREWALL; then
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c "sudo /usr/local/bin/init-firewall.sh && claude $CLAUDE_FLAGS ${CLAUDE_ARGS[*]}"
+            bash -c "$SEED_SETTINGS && sudo /usr/local/bin/init-firewall.sh && claude $CLAUDE_FLAGS ${CLAUDE_ARGS[*]}"
     else
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c "claude $CLAUDE_FLAGS ${CLAUDE_ARGS[*]}"
+            bash -c "$SEED_SETTINGS && claude $CLAUDE_FLAGS ${CLAUDE_ARGS[*]}"
     fi
 else
     # Interactive: drop into shell with claude available
     if $ENABLE_FIREWALL; then
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c "sudo /usr/local/bin/init-firewall.sh && echo \"Claude Code sandbox ready. Run: claude $CLAUDE_FLAGS\" && exec bash"
+            bash -c "$SEED_SETTINGS && sudo /usr/local/bin/init-firewall.sh && echo \"Claude Code sandbox ready. Run: claude $CLAUDE_FLAGS\" && exec bash"
     else
         docker run "${DOCKER_ARGS[@]}" \
-            bash -c "echo \"Claude Code sandbox ready (no firewall). Run: claude $CLAUDE_FLAGS\" && exec bash"
+            bash -c "$SEED_SETTINGS && echo \"Claude Code sandbox ready (no firewall). Run: claude $CLAUDE_FLAGS\" && exec bash"
     fi
 fi
